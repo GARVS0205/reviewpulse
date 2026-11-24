@@ -124,3 +124,36 @@ scope with a single-page Streamlit project. Earlier inspection evidence remains 
   https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy
   and https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies.
   Git repository creation, public upload and Cloud deployment were not performed.
+
+## 2026-11-24 — Automatic Opinion Summarization & Feature Summaries Enhancement
+
+- Analyzed the project against the problem statement: "Automatic Opinion Summarization from Customer Reviews: Analyze multiple customer reviews and generate summaries of positive opinions, negative opinions, and frequently discussed features."
+- Identified missing functionality: previously only general positive/negative quotes and a feature frequency bar chart existed; there was no opinion summarization for frequently discussed features, and no support for analyzing custom reviews.
+- Enhanced `nlp.py`:
+  - Added `summarize_features(sentences, features_table, top_n=3)` to identify top discussed features and extract customer praise (positive quote) and concerns (negative quote) per feature along with sentiment proportions.
+  - Added fallback in `summarize()` to include shorter sentences (>= 3 words) if insufficient 6-word sentences are available, ensuring opinions are not dropped.
+  - Made `analyze()` robust to input DataFrames lacking `source_line` or `overall` columns.
+  - Expanded regex patterns for common electronics aspects.
+- Enhanced `app.py`:
+  - Added descriptive product labels to the 20 preloaded ASINs (e.g. HDMI Cable, SanDisk MicroSD Card, Kindle Fire Tablet) for clarity.
+  - Added dual review input support: "Preloaded Product Dataset" and "Analyze Custom Reviews" (enabling on-the-fly multi-review analysis).
+  - Added a dedicated "Frequently Discussed Features Summary" section presenting structured cards with mention volume, sentiment ratio, and positive/negative quotes per top feature.
+  - Polished opinion quote cards with colored indicators and metadata.
+- Updated `requirements.txt` to use flexible `>=` version constraints.
+- Verified execution of `ReviewNLP` pipeline and `app.py` end-to-end with both sample and custom inputs.
+
+## 2026-11-24 — Product Item Display in Custom Reviews
+
+- Addressed user feedback where the product item was not identified or shown in custom review mode.
+- Added a dedicated "Product / Item Name" text input and sample product presets (Headphones, Smart TV, Keyboard, Custom) in `app.py`.
+- Added a prominent product banner displaying the item name and review count.
+- Integrated the product item name across all sentiment breakdowns, general opinion summaries, feature summaries, and the raw review explorer table.
+
+## 2026-11-24 — Export Reports, CSV Upload, Feature Filtering & Evaluation Metrics
+
+- Implemented 4 focused, low-complexity feature enhancements:
+  1. **Downloadable Opinion Summary Report**: Added `generate_summary_report()` and an `st.download_button` exporting a structured text report with all sentiment ratios, general opinion quotes, and feature-specific summaries.
+  2. **CSV File Upload Support**: In Custom Reviews mode, users can upload any arbitrary CSV review dataset, auto-detect the review column, and summarize opinions instantly.
+  3. **Feature Filter in Review Explorer**: Added a feature selector in the raw review browser allowing users to filter reviews discussing specific features (e.g. Battery, Price, Build Quality).
+  4. **Sentiment vs. Star Rating Polarity Agreement**: Computes and displays the alignment rate between VADER polarity and numerical star ratings (★4-5 Positive, ★1-2 Negative, ★3 Neutral).
+- Verified end-to-end import, CSV loading, and report generation with zero runtime errors.

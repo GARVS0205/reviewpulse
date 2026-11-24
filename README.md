@@ -1,40 +1,50 @@
 # ReviewPulse
 
-A small university NLP project: select one electronics product, inspect VADER
-sentiment and keyword feature opinions, and read extractive positive/negative quotes.
-No API key, database, GPU, or model training is required.
+**Automatic Opinion Summarization from Customer Reviews**
 
-## Run locally (Windows PowerShell)
+ReviewPulse analyzes multiple customer reviews to automatically generate explainable summaries of positive opinions, negative opinions, and frequently discussed features. Built with Streamlit, NLTK, and VADER sentiment analysis — requiring no API keys, GPU, external database, or heavy model training.
 
-Use Python **3.12**, not the older system Python 3.6. The prepared environment in
-this workspace already uses Python 3.12.
+## Key Features
 
-```powershell
-.venv/Scripts/python.exe -m streamlit run app.py
+1. **Overall Sentiment Breakdown**: Classifies opinions into Positive, Neutral, and Negative sentiments using NLTK VADER compound polarity scoring.
+2. **General Opinion Summaries**:
+   - **What customers liked**: Frequency-ranked, diverse extractive summary quotes for positive opinions.
+   - **What customers disliked**: Frequency-ranked, diverse extractive summary quotes for negative opinions.
+3. **Frequently Discussed Features Summary**: Automatically detects the most frequently mentioned product features (Battery, Display, Sound, Camera, Performance, Connectivity, Build Quality, Price, Comfort) and extracts specific customer praise and concerns for each feature.
+4. **Flexible Review Analysis**:
+   - **Preloaded Electronics Dataset**: Explore 20 Amazon Electronics products (150 reviews each, balanced across star ratings) labeled with descriptive names (e.g., HDMI Cables, SanDisk Flash Drives, Kindle Tablets).
+   - **Custom Reviews (Text or CSV Upload)**: Type/paste reviews for any custom product or upload any `.csv` file with automatic review-column detection.
+5. **Sentiment vs. Star Rating Alignment**: Computes alignment percentage between VADER polarity and numerical star ratings (★4-5 Positive, ★1-2 Negative, ★3 Neutral).
+6. **Downloadable Opinion Reports**: Export a complete, formatted text summary report (`.txt`) with one click.
+7. **Interactive Review Explorer with Feature Filtering**: Filter reviews by both sentiment label and specific product feature mentions (e.g., Battery, Price, Build Quality).
+
+## Run locally (Windows / macOS / Linux)
+
+### Run directly with Python & Streamlit:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-For a fresh checkout with Python 3.12 installed:
+Or using a virtual environment:
 
 ```powershell
-py -3.12 -m venv .venv
-.venv/Scripts/python.exe -m pip install -r requirements.txt
-.venv/Scripts/python.exe -m streamlit run app.py
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-The CSV and small NLTK resources are included. You do not need the large source
-file to run or deploy the app. To refresh NLTK resources, run
-`.venv/Scripts/python.exe nlp.py` (requires internet).
+The sample CSV and required NLTK resources (`stopwords`, `vader_lexicon`) are pre-bundled in `nltk_data/` for offline startup.
 
 ## Understand the code
 
-- `prepare_data.py`: validates JSONL one line at a time in two passes, selects
-  20 well-reviewed ASINs, deduplicates texts and samples 30 reviews per star per
-  product with seed 42. Saves 3,000 reviews and preparation metadata.
-- `nlp.py`: NLTK tokenization, stopword removal and stemming; VADER scores;
-  feature keyword matches; frequency-ranked, diverse source-sentence summaries.
-- `app.py`: one Streamlit page; caches the small CSV, NLP resources and product analysis.
-- `data/reviews_sample.csv`: application data, with no reviewer name or ID columns.
-- `DEVELOPMENT_LOG.md`: decisions, commands, verification and limitations.
+- `nlp.py`: Explainable NLP pipeline using NLTK: tokenization, stopword filtering with negation retention, Porter stemming, VADER polarity scoring, keyword-based aspect matching, and extractive opinion summarization (`summarize()` and `summarize_features()`).
+- `app.py`: Streamlit dashboard with product selection, custom review input, metrics, sentiment and feature charts, opinion summaries, and review browsing.
+- `prepare_data.py`: Streaming two-pass sampler that balances star ratings across 20 products from raw review JSONL.
+- `data/reviews_sample.csv`: Pre-sampled dataset of 3,000 Amazon Electronics reviews.
+- `DEVELOPMENT_LOG.md`: Implementation decisions, verification steps, and project history.
 
 Recreate the sample locally, only if you have the source file:
 

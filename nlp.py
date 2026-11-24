@@ -13,15 +13,15 @@ from nltk.tokenize import PunktSentenceTokenizer, RegexpTokenizer
 DATA_DIR = Path(__file__).parent / "nltk_data"
 nltk.data.path.insert(0, str(DATA_DIR))
 FEATURES = {
-    "Battery": r"\bbatter(?:y|ies)\b",
-    "Display": r"\b(?:screen|display|monitor)\b",
-    "Sound": r"\b(?:sound|audio|bass|volume)\b",
-    "Camera": r"\b(?:camera|photos?|pictures?)\b",
-    "Performance": r"\b(?:performance|speed|fast|slow)\b",
-    "Connectivity": r"\b(?:wi-?fi|bluetooth|connection|connectivity)\b",
-    "Build quality": r"\b(?:durable|durability|build quality|plastic|sturdy)\b",
-    "Price": r"\b(?:price|cost|expensive|cheap|value)\b",
-    "Comfort": r"\b(?:comfort|comfortable|uncomfortable)\b",
+    "Battery": r"\b(?:batter(?:y|ies)|charg(?:e|er|ing|ed))\b",
+    "Display": r"\b(?:screen|display|monitor|resolution)\b",
+    "Sound": r"\b(?:sound|audio|bass|volume|speakers?|mic(?:rophone)?)\b",
+    "Camera": r"\b(?:camera|photos?|pictures?|lens|video)\b",
+    "Performance": r"\b(?:performance|speed|fast|slow|lag|responsive)\b",
+    "Connectivity": r"\b(?:wi-?fi|bluetooth|connection|connectivity|pairing)\b",
+    "Build quality": r"\b(?:durable|durability|build quality|plastic|sturdy|flimsy|broke|broken)\b",
+    "Price": r"\b(?:price|cost|expensive|cheap|value|worth|affordable)\b",
+    "Comfort": r"\b(?:comfort|comfortable|uncomfortable|fit)\b",
 }
 PATTERNS = {name: re.compile(pattern, re.I) for name, pattern in FEATURES.items()}
 
@@ -63,17 +63,21 @@ class ReviewNLP:
         reviews["processed_tokens"] = reviews["reviewText"].map(self.preprocess)
         sentence_rows = []
         feature_rows = []
-        for row in reviews.to_dict("records"):
-            for sentence in self.sentences.tokenize(row["reviewText"]):
+        for idx, row in enumerate(reviews.to_dict("records")):
+            source_line = row.get("source_line", idx + 1)
+            asin = row.get("asin", "N/A")
+            overall = row.get("overall", 0)
+            text = str(row.get("reviewText", ""))
+            for sentence in self.sentences.tokenize(text):
                 score = self.score(sentence)
                 features = [name for name, pattern in PATTERNS.items() if pattern.search(sentence)]
                 item = {"sentence": sentence, "compound": score, "sentiment": self.label(score),
-                        "source_line": row["source_line"], "asin": row["asin"], "overall": row["overall"],
+                        "source_line": source_line, "asin": asin, "overall": overall,
                         "features": features, "tokens": self.preprocess(sentence)}
                 sentence_rows.append(item)
                 for feature in features:
                     feature_rows.append({"Feature": feature, "Sentiment": item["sentiment"],
-                                         "source_line": row["source_line"]})
+                                         "source_line": source_line})
         features = pd.DataFrame(feature_rows, columns=["Feature", "Sentiment", "source_line"])
         # Count each review once per feature/sentiment, even with repeated mentions.
         features = features.drop_duplicates()
@@ -82,12 +86,29 @@ class ReviewNLP:
         else:
             table = pd.crosstab(features["Feature"], features["Sentiment"]).reindex(
                 columns=["Positive", "Neutral", "Negative"], fill_value=0)
+
+        # Map mentioned features back to each review row for filtering and inspection
+        review_features_map = {}
+        for item in sentence_rows:
+            line_key = item["source_line"]
+            if line_key not in review_features_map:
+                review_features_map[line_key] = set()
+            review_features_map[line_key].update(item["features"])
+
+        reviews["features_mentioned"] = [
+            sorted(review_features_map.get(row.get("source_line", idx + 1), set()))
+            for idx, row in enumerate(reviews.to_dict("records"))
+        ]
         return reviews, table, sentence_rows
 
-    def summarize(self, sentences, sentiment, limit=3):
+    def summarize(self, sentences, sentiment, limit=3, min_words=6):
         """Rank actual sentences by token frequency, sentiment, and feature evidence."""
         candidates = [s for s in sentences if s["sentiment"] == sentiment
-                      and 6 <= len(self.words.tokenize(s["sentence"])) <= 65]
+                      and min_words <= len(self.words.tokenize(s["sentence"])) <= 65]
+        # Fallback to shorter sentences if not enough candidates meet the standard length filter
+        if len(candidates) < limit and min_words > 3:
+            candidates = [s for s in sentences if s["sentiment"] == sentiment
+                          and 3 <= len(self.words.tokenize(s["sentence"])) <= 65]
         frequency = Counter(token for s in candidates for token in s["tokens"])
         def rank(s):
             terms = s["tokens"]
@@ -109,6 +130,37 @@ class ReviewNLP:
             if len(chosen) == limit:
                 break
         return chosen
+
+    def summarize_features(self, sentences, features_table, top_n=3):
+        """Generate structured opinion summaries for the most frequently discussed features."""
+        if features_table.empty:
+            return []
+        table = features_table.copy()
+        table["Total"] = table["Positive"] + table["Neutral"] + table["Negative"]
+        top_features = table[table["Total"] > 0].sort_values(by="Total", ascending=False).head(top_n)
+        summaries = []
+        for feature, row in top_features.iterrows():
+            total = int(row["Total"])
+            pos_count = int(row["Positive"])
+            neg_count = int(row["Negative"])
+            neu_count = int(row["Neutral"])
+            feat_sentences = [s for s in sentences if feature in s["features"]]
+            pos_quotes = self.summarize(feat_sentences, "Positive", limit=1, min_words=4)
+            neg_quotes = self.summarize(feat_sentences, "Negative", limit=1, min_words=4)
+            pos_ratio = (pos_count / total * 100) if total > 0 else 0
+            neg_ratio = (neg_count / total * 100) if total > 0 else 0
+            summaries.append({
+                "feature": feature,
+                "total_mentions": total,
+                "positive_count": pos_count,
+                "negative_count": neg_count,
+                "neutral_count": neu_count,
+                "pos_ratio": pos_ratio,
+                "neg_ratio": neg_ratio,
+                "positive_quote": pos_quotes[0] if pos_quotes else None,
+                "negative_quote": neg_quotes[0] if neg_quotes else None,
+            })
+        return summaries
 
 
 if __name__ == "__main__":
