@@ -1,0 +1,14 @@
+# Original data must never be committed or deployed.
+Electronics_5.json
+*.jsonl
+*.json.gz
+*.zip
+!nltk_data/**/*.zip
+.python/
+.uv-cache/
+.venv/
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+.env
+verification_output.json
